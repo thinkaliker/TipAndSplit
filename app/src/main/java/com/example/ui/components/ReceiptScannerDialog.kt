@@ -1,7 +1,12 @@
 package com.example.ui.components
 
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.MediaStore
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +32,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.AlertDialog
@@ -75,6 +81,7 @@ fun ReceiptScannerDialog(
 ) {
     val context = LocalContext.current
     var tempPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var localError by remember { mutableStateOf<String?>(null) }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -82,6 +89,24 @@ fun ReceiptScannerDialog(
     ) { success ->
         if (success) {
             tempPhotoUri?.let { onImageSelected(it) }
+        }
+    }
+
+    fun launchCamera() {
+        try {
+            val uri = createTempImageUri(context)
+            if (uri == null) {
+                localError = "Could not initialize image storage for camera. Please choose an image from Photos instead."
+                return
+            }
+            tempPhotoUri = uri
+            cameraLauncher.launch(uri)
+        } catch (e: ActivityNotFoundException) {
+            localError = "No camera application found on this device or emulator. Please choose a receipt photo from Photos instead."
+        } catch (e: SecurityException) {
+            localError = "Camera access was restricted by the system. Please select a receipt photo from Photos."
+        } catch (e: Throwable) {
+            localError = "Camera could not be launched on this device: ${e.localizedMessage ?: "Device not supported"}. Please choose a photo from Photos instead."
         }
     }
 
@@ -102,6 +127,8 @@ fun ReceiptScannerDialog(
             selectedItemIndices = scannedResult.items.indices.toSet()
         }
     }
+
+    val displayError = localError ?: errorMessage
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -165,27 +192,38 @@ fun ReceiptScannerDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    if (errorMessage != null) {
+                    if (displayError != null) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.errorContainer,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = errorMessage,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(12.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = displayError,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
 
                     // Option 1: Take Photo with Camera
                     Button(
                         onClick = {
-                            val uri = createTempImageUri(context)
-                            tempPhotoUri = uri
-                            cameraLauncher.launch(uri)
+                            localError = null
+                            launchCamera()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -203,9 +241,14 @@ fun ReceiptScannerDialog(
                     // Option 2: Select from Photo Library
                     OutlinedButton(
                         onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
+                            localError = null
+                            try {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            } catch (e: Throwable) {
+                                localError = "Could not open photo picker: ${e.localizedMessage}"
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -225,7 +268,10 @@ fun ReceiptScannerDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .clickable { onSampleRequested() }
+                            .clickable {
+                                localError = null
+                                onSampleRequested()
+                            }
                             .testTag("scan_sample_receipt_button")
                     ) {
                         Row(
@@ -417,16 +463,29 @@ fun ReceiptScannerDialog(
     )
 }
 
-private fun createTempImageUri(context: Context): Uri {
-    val tempFile = File.createTempFile("receipt_photo_", ".jpg", context.cacheDir).apply {
-        createNewFile()
-        deleteOnExit()
+private fun createTempImageUri(context: Context): Uri? {
+    return try {
+        val imagesFolder = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+        val tempFile = File.createTempFile("receipt_snap_", ".jpg", imagesFolder)
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            tempFile
+        )
+    } catch (e: Throwable) {
+        Log.e("ReceiptScanner", "Failed to create temp URI in subfolder", e)
+        try {
+            val tempFile = File.createTempFile("receipt_snap_", ".jpg", context.cacheDir)
+            FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                tempFile
+            )
+        } catch (e2: Throwable) {
+            Log.e("ReceiptScanner", "Failed to create temp URI in root cache", e2)
+            null
+        }
     }
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        tempFile
-    )
 }
 
 private fun formatAmount(value: Double): String {
