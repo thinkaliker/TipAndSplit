@@ -21,6 +21,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "TipCalcViewModel"
+private val defaultPeople = listOf(
+    Person(id = "person_adam", name = "Adam", colorIndex = 0),
+    Person(id = "person_chris", name = "Chris", colorIndex = 1)
+)
+
+private val defaultItems = listOf(
+    BillItem(id = "item_pasta", name = "Pasta Primavera", price = 22.00, assignedPersonIds = setOf("person_adam")),
+    BillItem(id = "item_salmon", name = "Grilled Salmon", price = 28.50, assignedPersonIds = setOf("person_chris")),
+    BillItem(id = "item_fries", name = "Truffle Fries", price = 14.00, assignedPersonIds = emptySet())
+)
 
 data class TipCalculatorUiState(
     val subtotalInput: String = "64.50",
@@ -30,15 +40,8 @@ data class TipCalculatorUiState(
     val splitMode: SplitMode = SplitMode.EVEN,
     val splitCount: Int = 2,
     val roundUpShare: Boolean = false,
-    val people: List<Person> = listOf(
-        Person(name = "Alex", colorIndex = 0),
-        Person(name = "Jordan", colorIndex = 1)
-    ),
-    val items: List<BillItem> = listOf(
-        BillItem(name = "Pasta Primavera", price = 22.00),
-        BillItem(name = "Grilled Salmon", price = 28.50),
-        BillItem(name = "Truffle Fries", price = 14.00)
-    ),
+    val people: List<Person> = defaultPeople,
+    val items: List<BillItem> = defaultItems,
     val calculatedSummary: CalculatedSummary = TipCalculatorEngine.calculate(
         subtotalInput = 64.50,
         taxInput = 5.80,
@@ -47,15 +50,8 @@ data class TipCalculatorUiState(
         splitMode = SplitMode.EVEN,
         splitCount = 2,
         roundUpShare = false,
-        people = listOf(
-            Person(name = "Alex", colorIndex = 0),
-            Person(name = "Jordan", colorIndex = 1)
-        ),
-        items = listOf(
-            BillItem(name = "Pasta Primavera", price = 22.00),
-            BillItem(name = "Grilled Salmon", price = 28.50),
-            BillItem(name = "Truffle Fries", price = 14.00)
-        )
+        people = defaultPeople,
+        items = defaultItems
     ),
     val isCustomTipDialogVisible: Boolean = false,
     val isAddItemDialogVisible: Boolean = false,
@@ -334,6 +330,7 @@ class TipCalculatorViewModel : ViewModel() {
                     tipPercentage = 18.0,
                     splitCount = 1,
                     roundUpShare = false,
+                    people = defaultPeople,
                     items = emptyList()
                 )
             )

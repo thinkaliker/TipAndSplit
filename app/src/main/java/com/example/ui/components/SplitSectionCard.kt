@@ -42,6 +42,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.People
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -89,6 +94,8 @@ fun SplitSectionCard(
     onRemovePerson: (String) -> Unit,
     onOpenAddItemDialog: () -> Unit,
     onRemoveItem: (String) -> Unit,
+    onTogglePersonOnItem: (itemId: String, personId: String) -> Unit = { _, _ -> },
+    onSetItemShared: (itemId: String) -> Unit = {},
     onOpenScanReceiptDialog: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -513,60 +520,142 @@ fun SplitSectionCard(
                         ) {
                             items.forEach { item ->
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(14.dp),
                                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .testTag("item_row_${item.id}")
                                 ) {
-                                    Row(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                            .padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = item.name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                            val assignedNames = if (item.assignedPersonIds.isEmpty()) {
-                                                "Shared by All"
-                                            } else {
-                                                people.filter { item.assignedPersonIds.contains(it.id) }
-                                                    .joinToString(", ") { it.name }
+                                        // Header Row: Item Name, Subtext, Price, Delete Icon
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = item.name,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                val assignedNames = if (item.assignedPersonIds.isEmpty()) {
+                                                    "Shared by everyone (split ${people.size}x)"
+                                                } else if (item.assignedPersonIds.size == 1) {
+                                                    val assignedPerson = people.find { it.id == item.assignedPersonIds.first() }
+                                                    "Assigned to ${assignedPerson?.name ?: "1 person"}"
+                                                } else {
+                                                    val eachAmount = item.price / item.assignedPersonIds.size
+                                                    val names = people.filter { item.assignedPersonIds.contains(it.id) }.joinToString(", ") { it.name }
+                                                    "Split between $names ($${String.format(java.util.Locale.US, "%.2f", eachAmount)} each)"
+                                                }
+                                                Text(
+                                                    text = assignedNames,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = if (item.assignedPersonIds.isEmpty()) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.Medium
+                                                )
                                             }
-                                            Text(
-                                                text = assignedNames,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
+
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$${String.format(java.util.Locale.US, "%.2f", item.price)}",
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                )
+                                                IconButton(
+                                                    onClick = { onRemoveItem(item.id) },
+                                                    modifier = Modifier.size(32.dp).testTag("delete_item_${item.id}")
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.DeleteOutline,
+                                                        contentDescription = "Remove item",
+                                                        tint = MaterialTheme.colorScheme.error,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
                                         }
 
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
+                                        // Interactive Assignment Chips
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                             Text(
-                                                text = "$${String.format(java.util.Locale.US, "%.2f", item.price)}",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                fontFamily = FontFamily.Monospace,
-                                                color = MaterialTheme.colorScheme.onSurface
+                                                text = "Assign to:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
-                                            IconButton(
-                                                onClick = { onRemoveItem(item.id) },
-                                                modifier = Modifier.size(32.dp).testTag("delete_item_${item.id}")
+
+                                            FlowRow(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(6.dp)
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DeleteOutline,
-                                                    contentDescription = "Remove item",
-                                                    tint = MaterialTheme.colorScheme.error,
-                                                    modifier = Modifier.size(18.dp)
+                                                val isShared = item.assignedPersonIds.isEmpty()
+
+                                                // Shared by All chip
+                                                FilterChip(
+                                                    selected = isShared,
+                                                    onClick = { onSetItemShared(item.id) },
+                                                    label = {
+                                                        Text("Shared (All)", style = MaterialTheme.typography.labelMedium)
+                                                    },
+                                                    leadingIcon = if (isShared) {
+                                                        {
+                                                            Icon(
+                                                                imageVector = Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                modifier = Modifier.size(14.dp)
+                                                            )
+                                                        }
+                                                    } else null,
+                                                    modifier = Modifier.testTag("item_${item.id}_chip_shared")
                                                 )
+
+                                                // Person Chips (Adam, Chris, etc.)
+                                                people.forEach { person ->
+                                                    val isAssigned = item.assignedPersonIds.contains(person.id)
+                                                    val color = AvatarColors[person.colorIndex % AvatarColors.size]
+
+                                                    FilterChip(
+                                                        selected = isAssigned,
+                                                        onClick = { onTogglePersonOnItem(item.id, person.id) },
+                                                        label = {
+                                                            Text(
+                                                                text = person.name,
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                fontWeight = if (isAssigned) FontWeight.Bold else FontWeight.Normal
+                                                            )
+                                                        },
+                                                        leadingIcon = {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .size(12.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(color)
+                                                            )
+                                                        },
+                                                        colors = FilterChipDefaults.filterChipColors(
+                                                            selectedContainerColor = color.copy(alpha = 0.2f),
+                                                            selectedLabelColor = color
+                                                        ),
+                                                        border = if (isAssigned) {
+                                                            BorderStroke(1.5.dp, color)
+                                                        } else null,
+                                                        modifier = Modifier.testTag("item_${item.id}_chip_${person.name.lowercase()}")
+                                                    )
+                                                }
                                             }
                                         }
                                     }

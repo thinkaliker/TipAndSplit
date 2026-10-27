@@ -128,6 +128,8 @@ fun TipCalculatorScreen(
                 onRemovePerson = { viewModel.removePerson(it) },
                 onOpenAddItemDialog = { viewModel.showAddItemDialog(true) },
                 onRemoveItem = { viewModel.removeItem(it) },
+                onTogglePersonOnItem = { itemId, personId -> viewModel.togglePersonOnItem(itemId, personId) },
+                onSetItemShared = { itemId -> viewModel.setItemShared(itemId) },
                 onOpenScanReceiptDialog = { viewModel.showScanReceiptDialog(true) }
             )
 
