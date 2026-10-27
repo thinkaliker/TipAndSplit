@@ -1,0 +1,6 @@
+{
+  "summary":  "Implementation plan for Tip & Split Calculator Android app featuring subtotal and tax inputs, configurable pre/post-tax tip percentages, standalone tip breakout, dual split modes (quick equal split with rounding and itemized person breakdown), and a modern dining receipt Material 3 design.",
+  "updatedAt":  "2026-10-27T06:48:17.981582596Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
